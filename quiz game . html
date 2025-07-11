@@ -1,0 +1,583 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Math Quiz Game by Muhammad Zeeshan</title>
+  <style>
+    /* Base */
+    body { margin:0; padding:0; font-family:Arial,sans-serif; transition:background .3s,color .3s; }
+    header,nav,main,section { max-width:800px; margin:auto; padding:20px; text-align:center; }
+    header { background:#111; color:lime; font-size:24px; }
+    .hidden { display:none; }
+    .btn, nav button { margin:8px; padding:12px 25px; background:#333; color:#fff; border:none; border-radius:8px; cursor:pointer; font-size:16px; }
+    .large-button { padding:15px 30px; font-size:18px; }
+    input[type="text"], select, input[type="number"] { padding:10px; border-radius:5px; width:80%; margin-top:10px; }
+    .question, .answer-review, .store-item, .riddle-box { background:#111; padding:15px; margin:15px 0; border-radius:10px; text-align:left; }
+    .question-number { font-weight:bold; display:block; margin-bottom:10px; }
+    .option-line { margin:8px 0; }
+    .correct { color:lime; } .wrong { color:red; }
+    .daily-reward { background:#2a2; padding:10px; margin:10px 0; border-radius:8px; color:#fff; font-weight:bold; }
+    .spin-wheel { display:flex; flex-wrap:wrap; gap:10px; justify-content:center; margin-top:15px; }
+    .wheel-number { background:#333; padding:10px 20px; border-radius:10px; cursor:pointer; }
+    .coin-display { position:fixed; top:10px; right:10px; background:#333; color:gold; padding:5px 10px; border-radius:5px; font-weight:bold; }
+    /* Themes */
+    body.theme-black { background:#000; color:#fff; }
+    body.theme-white { background:#fff; color:#000; }
+    body.theme-blue  { background:#001f3f; color:#7FDBFF; }
+    body.theme-green { background:#003300; color:#ccffcc; }
+    body.theme-red   { background:#660000; color:#ffcccc; }
+    body.theme-white header { background:#eee; color:#000; }
+    body.theme-white .question, body.theme-white .answer-review, 
+    body.theme-white .store-item, body.theme-white .riddle-box { background:#eee; color:#000; }
+  </style>
+</head>
+<body class="theme-black">
+  <div class="coin-display" id="coinDisplay">Coins: 0</div>
+  <header>The Quiz is made by Muhammad Zeeshan</header>
+  <nav>
+    <button onclick="showSection('menu')">🏠 Menu</button>
+    <button onclick="showSection('instructions')">📘 Instructions</button>
+    <button onclick="showSection('records')">📊 Records</button>
+    <button onclick="showSection('store')">💎 Items</button>
+    <button onclick="showSection('convert')">🔄 Convert</button>
+    <button onclick="showSection('betting')">🎰 Bet</button>
+    <button onclick="showSection('miniGames')">🎮 Mini-Games</button>
+    <button onclick="showSection('themeMenu')">🎨 Theme</button>
+    <button onclick="toggleSound()">🔊 Sound</button>
+  </nav>
+
+  <main id="menu">
+    <h2>Enter Your Name to Start</h2>
+    <input type="text" id="username" placeholder="Your name…" />
+    <h3>Select Category:</h3>
+    <select id="category">
+      <option value="algebra">Algebra</option>
+      <option value="geometry">Geometry</option>
+      <option value="calculus">Calculus</option>
+    </select><br>
+    <button onclick="startQuiz()">▶️ Start Quiz</button>
+    <div class="daily-reward" id="dailyRewardBox"></div>
+  </main>
+
+  <section id="instructions" class="hidden">
+    <h2>📘 Instructions</h2>
+    <p>– You have 1:30 to answer 10 questions (one at a time).</p>
+    <p>– Each correct gives 1 coin + 1 point.</p>
+    <p>– View score, IQ & solutions at end.</p>
+    <p>– Use Bet & Mini-Games to earn more coins.</p>
+  </section>
+
+  <section id="records" class="hidden">
+    <h2>📊 Records</h2>
+    <div id="recordData">No records yet.</div>
+  </section>
+  <section id="quiz" class="hidden"></section>
+
+  <section id="result" class="hidden">
+    <h2>🎉 Quiz Over!</h2>
+    <p>Your Score: <span id="finalScore"></span>/10</p>
+    <p>Your IQ: <span id="finalIQ"></span></p>
+    <p>Your XP: <span id="finalXP"></span></p>
+    <button onclick="showAnswers()">📝 View Answers</button>
+    <button onclick="startQuiz()">🔁 Restart Quiz</button>
+  </section>
+
+  <section id="answersPage" class="hidden"></section>
+
+  <section id="themeMenu" class="hidden">
+    <h2>🎨 Select Theme</h2>
+    <button onclick="setTheme('black')">Black</button>
+    <button onclick="setTheme('white')">White</button>
+    <button onclick="setTheme('blue')">Blue</button>
+    <button onclick="setTheme('green')">Green</button>
+    <button onclick="setTheme('red')">Red</button>
+  </section>
+
+  <!-- Audio -->
+  <audio id="correctSound" src="https://www.soundjay.com/buttons/sounds/button-4.mp3" preload="auto"></audio>
+  <audio id="wrongSound"   src="https://www.soundjay.com/buttons/sounds/button-10.mp3" preload="auto"></audio>
+  <audio id="clickSound"   src="https://www.soundjay.com/buttons/sounds/button-16.mp3" preload="auto"></audio>
+  <audio id="spinSound"    src="https://www.soundjay.com/misc/sounds/bell-ringing-05.mp3" preload="auto"></audio>
+
+  <script>
+    // ─── GLOBALS ──────────────────────────────────────────────────────────
+    const store = [
+      { name:"Gold", price:300 },
+      { name:"Silver", price:50 },
+      { name:"Diamond", price:500 },
+      { name:"Big Brain", price:700 },
+      { name:"Einstein Brain", price:1000 }
+    ];
+
+    let userName = "", selected = [], userAnswers = [], score = 0, xp = 0;
+    let coins = parseInt(localStorage.getItem('coins')||'0');
+    let current = 0, timerId, timer = 90;
+    let soundEnabled = true;
+    let questionHistory = JSON.parse(localStorage.getItem('questionHistory') || '{"algebra":[],"geometry":[],"calculus":[],"miniGames":[],"betting":[]}');
+
+    // Update coin display
+    function updateCoinDisplay() {
+      document.getElementById('coinDisplay').textContent = `Coins: ${coins}`;
+    }
+
+    // ─── SOUND ────────────────────────────────────────────────────────────
+    function playSound(id) {
+      if (!soundEnabled) return;
+      const a = document.getElementById(id);
+      if (a) { a.currentTime = 0; a.play(); }
+    }
+    function toggleSound() {
+      soundEnabled = !soundEnabled;
+      alert("🔊 Sound " + (soundEnabled?"ON":"OFF"));
+    }
+
+    // ─── THEME ────────────────────────────────────────────────────────────
+    function setTheme(t) {
+      document.body.className = 'theme-'+t;
+      localStorage.setItem('theme', t);
+      // Update text color based on theme
+      if(t === 'white') {
+        document.body.style.color = '#000';
+      } else {
+        document.body.style.color = '#fff';
+      }
+    }
+    window.addEventListener('DOMContentLoaded', () => {
+      setTheme(localStorage.getItem('theme')||'black');
+      updateCoinDisplay();
+    });
+
+    // ─── SECTIONS ─────────────────────────────────────────────────────────
+    function showSection(id) {
+      document.querySelectorAll('main, section').forEach(el=>el.classList.add('hidden'));
+      document.getElementById(id).classList.remove('hidden');
+      if (id==='records') loadRecords();
+      if (id==='store') loadStore();
+      if (id==='convert') loadConvert();
+      playSound('clickSound');
+    }
+
+    // ─── DAILY REWARD ────────────────────────────────────────────────────
+    (function dailyReward(){
+      const today = new Date().toLocaleDateString();
+      if (localStorage.getItem('lastReward')!==today) {
+        const bonus = Math.floor(Math.random()*11+10);
+        coins += bonus; localStorage.setItem('coins',coins);
+        localStorage.setItem('lastReward',today);
+        document.getElementById('dailyRewardBox').textContent = `🎁 Daily +${bonus} coins`;
+        updateCoinDisplay();
+      } else {
+        document.getElementById('dailyRewardBox').textContent = `✅ Reward claimed`;
+      }
+    })();
+  </script><script>
+    // ─── QUESTION BANKS ──────────────────────────────────────────────────
+    const questionsBank = {
+      algebra: generateMathQuestions('algebra', 500),
+      geometry: generateMathQuestions('geometry', 500),
+      calculus: generateMathQuestions('calculus', 500)
+    };
+
+    function generateMathQuestions(category, count) {
+      const questions = [];
+      for(let i = 1; i <= count; i++) {
+        let a = Math.floor(Math.random() * 50) + 1;
+        let b = Math.floor(Math.random() * 50) + 1;
+        let c = Math.floor(Math.random() * 10) + 1;
+        let question, answer, options = [];
+        
+        if(category === 'algebra') {
+          // Algebra questions
+          const types = [
+            { q: `${a}x + ${b} = ${a*5 + b}`, a: "5", s: `Subtract ${b} from both sides: ${a}x = ${a*5}, then divide by ${a}` },
+            { q: `Solve for x: ${a}(x + ${b}) = ${a*(b+3)}`, a: "3", s: `Divide both sides by ${a}: x + ${b} = ${b+3}, then subtract ${b}` },
+            { q: `If x = ${a}, what is ${b}x - ${c}?`, a: (b*a-c).toString(), s: `Substitute x: ${b}*${a} - ${c} = ${b*a - c}` },
+            { q: `Factor: x² + ${a+b}x + ${a*b}`, a: `(x+${a})(x+${b})`, s: `Find two numbers that multiply to ${a*b} and add to ${a+b}` },
+            { q: `Simplify: (${a}x² + ${b}x) / x`, a: `${a}x + ${b}`, s: `Divide each term by x` }
+          ];
+          const type = types[Math.floor(Math.random() * types.length)];
+          question = type.q;
+          answer = type.a;
+          solution = type.s;
+        } 
+        else if(category === 'geometry') {
+          // Geometry questions
+          const types = [
+            { q: `Area of rectangle with sides ${a} and ${b}?`, a: (a*b).toString(), s: `Area = length × width = ${a} × ${b}` },
+            { q: `Perimeter of triangle with sides ${a}, ${b}, ${c}?`, a: (a+b+c).toString(), s: `Perimeter = sum of all sides` },
+            { q: `Volume of cube with side ${a}?`, a: (a*a*a).toString(), s: `Volume = side³ = ${a} × ${a} × ${a}` },
+            { q: `Circumference of circle with radius ${a}? (π=3.14)`, a: (2*3.14*a).toFixed(2), s: `Circumference = 2πr = 2 × 3.14 × ${a}` },
+            { q: `Area of circle with diameter ${a}? (π=3.14)`, a: (3.14*(a/2)*(a/2)).toFixed(2), s: `Radius = diameter/2 = ${a/2}, Area = πr²` }
+          ];
+          const type = types[Math.floor(Math.random() * types.length)];
+          question = type.q;
+          answer = type.a;
+          solution = type.s;
+        } 
+        else if(category === 'calculus') {
+          // Calculus questions
+          const types = [
+            { q: `Derivative of ${a}x² + ${b}x + ${c}?`, a: `${2*a}x + ${b}`, s: `Power rule: derivative of xⁿ is nxⁿ⁻¹` },
+            { q: `Integral of ${a}x + ${b}?`, a: `${a/2}x² + ${b}x + C`, s: `Power rule: integral of xⁿ is xⁿ⁺¹/(n+1)` },
+            { q: `Limit of (x²-${a*a})/(x-${a}) as x→${a}?`, a: (2*a).toString(), s: `Factor numerator: (x-${a})(x+${a})/(x-${a}) = x+${a}` },
+            { q: `Derivative of sin(${a}x)?`, a: `${a}cos(${a}x)`, s: `Chain rule: derivative of sin(u) is cos(u)*u'` },
+            { q: `Integral of e^(${a}x)?`, a: `(1/${a})e^(${a}x) + C`, s: `Integral of e^u is (1/u')e^u` }
+          ];
+          const type = types[Math.floor(Math.random() * types.length)];
+          question = type.q;
+          answer = type.a;
+          solution = type.s;
+        }
+        
+        // Generate 4 options including correct answer
+        options = [answer];
+        while(options.length < 4) {
+          let wrong;
+          if(typeof answer === 'string' && answer.includes('x')) {
+            // For algebraic answers
+            const parts = answer.split('x');
+            const coeff = parts[0] ? parseInt(parts[0]) : 1;
+            wrong = `${coeff + (Math.random() > 0.5 ? 1 : -1)*Math.floor(Math.random()*3+1)}x${parts[1] || ''}`;
+          } else {
+            // For numeric answers
+            const num = parseFloat(answer);
+            wrong = (num + (Math.random() > 0.5 ? 1 : -1)*Math.floor(Math.random()*5+1)).toString();
+            if(answer.includes('.')) wrong = parseFloat(wrong).toFixed(2);
+          }
+          if(!options.includes(wrong)) options.push(wrong);
+        }
+        
+        // Shuffle options
+        options = options.sort(() => Math.random() - 0.5);
+        
+        questions.push({
+          question,
+          options,
+          answer,
+          solution
+        });
+      }
+      return questions;
+    }
+
+    // ─── START QUIZ ──────────────────────────────────────────────────────
+    function startQuiz(){
+      userName = document.getElementById('username').value.trim();
+      if(!userName) return alert("Please enter your name!");
+      localStorage.setItem('coins', coins);
+      updateCoinDisplay();
+      
+      const cat = document.getElementById('category').value;
+      const pool = [...questionsBank[cat]].filter(q => 
+        !questionHistory[cat].includes(q.question)
+      );
+      
+      // If we've shown most questions, reset history
+      if(pool.length < 50) {
+        questionHistory[cat] = [];
+        localStorage.setItem('questionHistory', JSON.stringify(questionHistory));
+        pool.push(...questionsBank[cat]);
+      }
+      
+      selected = [];
+      for(let i=0; i<10 && pool.length>0; i++){
+        const idx = Math.floor(Math.random() * pool.length);
+        selected.push(pool.splice(idx,1)[0]);
+        questionHistory[cat].push(selected[i].question);
+      }
+      
+      localStorage.setItem('questionHistory', JSON.stringify(questionHistory));
+      userAnswers = Array(10).fill(undefined);
+      score=0; xp=0; timer=90;
+      showSection('quiz');
+      renderQuestion(0);
+      timerId = setInterval(() => {
+        document.getElementById('timer')?.remove();
+        const tdiv = document.createElement('div');
+        tdiv.id='timer'; tdiv.style.fontSize='20px';
+        tdiv.textContent = `⏳ ${timer}s`;
+        document.getElementById('quiz').prepend(tdiv);
+        if(--timer<0){ clearInterval(timerId); finishQuiz(); }
+      },1000);
+    }
+
+    function renderQuestion(i){
+      current=i;
+      const q=selected[i];
+      const quiz=document.getElementById('quiz');
+      let html=`<div class="question">
+        <span class="question-number">Question No : ${i+1}</span>
+        <div class="question-text">${q.question} = _________</div>`;
+      q.options.forEach((opt,idx)=>{
+        const checked = userAnswers[i]===opt?'checked':'';
+        html += `<div class="option-line">
+          <label><input type="radio" name="q${i}" value="${opt}" ${checked}
+            onchange="selectAnswer(${i},'${opt}')"/> (${idx+1}) ${opt}</label>
+        </div>`;
+      });
+      if(i>0) html+=`<button onclick="renderQuestion(${i-1})" class="btn large-button">⬅️ Previous</button>`;
+      if(i<9) html+=`<button onclick="renderQuestion(${i+1})" class="btn large-button">Next ➡️</button>`;
+      if(i===9) html+=`<button onclick="finishQuiz()" class="btn large-button">✅ Finish</button>`;
+      html+=`</div><div id="hintBox" class="hidden"></div>`;
+      quiz.innerHTML=html;
+    }
+
+    function selectAnswer(i,val){
+      userAnswers[i]=val;
+      playSound('clickSound');
+    }
+
+    function finishQuiz(){
+      clearInterval(timerId);
+      if(userAnswers.includes(undefined)) return alert("Answer all before finishing!");
+      selected.forEach((q,i)=>{
+        if(userAnswers[i]==q.answer){ score++; coins++; xp+=10; }
+      });
+      const iq = Math.round((score/10)*140);
+      localStorage.setItem('coins',coins);
+      updateCoinDisplay();
+      saveRecord(userName,score,iq,xp);
+      document.getElementById('finalScore').textContent=score;
+      document.getElementById('finalIQ').textContent=iq;
+      document.getElementById('finalXP').textContent=xp;
+      showSection('result');
+      playSound(score > 5 ? 'correctSound' : 'wrongSound');
+    }
+
+    function showAnswers(){
+      const box=document.getElementById('answersPage');
+      box.innerHTML = `<h2>Answers of Questions</h2>` +
+        selected.map((q,i)=>
+          `<div class="answer-review">
+            ${i+1}. ${q.question}<br>
+            Your: ${userAnswers[i]} ${userAnswers[i]==q.answer?'<span class="correct">✓</span>':'<span class="wrong">✗</span>'}<br>
+            Correct: ${q.answer}<br>
+            Solution: ${q.solution}
+          </div>`
+        ).join('') +
+        `<button onclick="showSection('menu')" class="btn">🔙 Back to Menu</button>`;
+      showSection('answersPage');
+    }
+
+    // ─── RECORDS ─────────────────────────────────────────────────────────
+    function saveRecord(name,score,iq,xp){
+      const recs=JSON.parse(localStorage.getItem('records')||'[]');
+      recs.push({name,score,iq,xp}); localStorage.setItem('records',JSON.stringify(recs));
+    }
+    function loadRecords(){
+      const recs=JSON.parse(localStorage.getItem('records')||'[]')
+        .sort((a,b)=>b.score-a.score)
+        .map(r=>`<div>${r.name}: ${r.score}/10, IQ:${r.iq}, XP:${r.xp}</div>`)
+        .join('')||'No records yet.';
+      document.getElementById('recordData').innerHTML=recs;
+    }
+  </script>  <section id="store" class="hidden">
+    <h2>💎 Items Store</h2>
+    <div id="storeItems"></div>
+  </section>
+
+  <section id="convert" class="hidden">
+    <h2>🔄 Convert Coins</h2>
+    <div id="convertItems"></div>
+  </section>
+
+  <section id="betting" class="hidden">
+    <h2>🎰 Bet Riddle Game</h2>
+    <div id="betGameBox" class="riddle-box"></div>
+    <button onclick="startBetGame()">🎯 Play Bet (10 coins)</button>
+  </section>
+
+  <section id="miniGames" class="hidden">
+    <h2>🎮 Mini Games</h2>
+    <button onclick="startMiniGame()">🔢 Quick Math (5 coins)</button>
+    <div id="miniGameBox"></div>
+  </section>
+
+  <script>
+    // ─── STORE & CONVERT ────────────────────────────────────────────────
+    function loadStore(){
+      let html=`<h3>Your Coins: ${coins}</h3>`;
+      store.forEach(i=>{
+        const owned = localStorage.getItem('item_'+i.name);
+        html+=`<div class="store-item">
+          ${i.name} ${owned?'✅':`<button onclick="buyItem('${i.name}',${i.price})">Buy</button>`}<br>
+          Price: ${i.price} coins
+        </div>`;
+      });
+      document.getElementById('storeItems').innerHTML=html;
+    }
+    function loadConvert(){
+      let html=`<h3>Your Coins: ${coins}</h3>`;
+      store.forEach(i=>{
+        html+=`<div class="store-item">
+          ${i.name}<br>
+          <button onclick="convertItem('${i.name}',${i.price})">Convert for ${i.price} coins</button>
+        </div>`;
+      });
+      document.getElementById('convertItems').innerHTML=html;
+    }
+    function buyItem(name,price){
+      if(coins<price) return alert("Not enough coins!");
+      coins-=price; localStorage.setItem('coins',coins);
+      localStorage.setItem('item_'+name,'owned');
+      playSound('clickSound');
+      updateCoinDisplay();
+      loadStore();
+    }
+    function convertItem(name,price){
+      buyItem(name,price);
+      loadConvert();
+    }
+
+    // ─── BET GAME ───────────────────────────────────────────────────────
+    const riddles = [
+      {q:"وہ کون سی چیز ہے جو اُڑتی ہے مگر پر نہیں رکھتی؟",a:"ہوا"},
+      {q:"وہ کیا ہے جو گرم کرنے سے جم جاتا ہے؟",a:"انڈا"},
+      {q:"ایسی کون سی چیز ہے جو پانی میں بھیگنے سے نہیں بھیگتی؟",a:"پیاس"},
+      {q:"وہ کون سا درخت ہے جس کا پھل زمین کے اندر ہوتا ہے؟",a:"مونگ پھلی"},
+      {q:"وہ کیا ہے جو آپ کے پاس ہو تو آپ کا نام نہیں لے سکتے؟",a:"خاموشی"},
+      // Add 145 more Urdu riddles here...
+    ];
+
+    function startBetGame(){
+      if(coins<10) return alert("Need 10 coins to play!");
+      
+      // Filter out recently used riddles
+      const availableRiddles = riddles.filter(r => 
+        !questionHistory.betting.includes(r.q)
+      );
+      
+      if(availableRiddles.length === 0) {
+        // Reset if we've shown most riddles
+        questionHistory.betting = [];
+        availableRiddles.push(...riddles);
+      }
+      
+      const r = availableRiddles[Math.floor(Math.random() * availableRiddles.length)];
+      questionHistory.betting.push(r.q);
+      localStorage.setItem('questionHistory', JSON.stringify(questionHistory));
+      
+      coins-=10; 
+      localStorage.setItem('coins',coins);
+      updateCoinDisplay();
+      
+      const hidden=Math.floor(Math.random()*10);
+      let html=`<p><strong>پہیلی:</strong> ${r.q}</p>
+        <div class="spin-wheel">`+
+        Array.from({length:10},(_,i)=>`<div class="wheel-number" onclick="guessSpin(${i},${hidden},'${r.a}')">${i}</div>`).join('')+
+        `</div>`;
+      document.getElementById('betGameBox').innerHTML=html;
+      playSound('spinSound');
+    }
+
+    function guessSpin(sel,hid,ans){
+      if(sel===hid){
+        const winAmount = 20 + Math.floor(Math.random() * 10);
+        alert(`🎉 You won ${winAmount} coins! The answer was "${ans}"`);
+        coins+=winAmount; 
+        localStorage.setItem('coins',coins);
+        updateCoinDisplay();
+      } else {
+        alert(`❌ Wrong! The answer was "${ans}"`);
+      }
+      document.getElementById('betGameBox').innerHTML='';
+    }
+
+    // ─── MINI GAMES ─────────────────────────────────────────────────────
+    const miniGameQuestions = generateMiniGameQuestions(200);
+
+    function generateMiniGameQuestions(count) {
+      const questions = [];
+      const operations = ['+', '-', '*', '/'];
+      
+      for(let i = 0; i < count; i++) {
+        const op = operations[Math.floor(Math.random() * operations.length)];
+        let a, b, question, answer;
+        
+        // Generate tricky questions
+        switch(op) {
+          case '+':
+            a = Math.floor(Math.random() * 100) + 1;
+            b = Math.floor(Math.random() * 100) + 1;
+            question = `${a} + ${b}`;
+            answer = a + b;
+            break;
+          case '-':
+            a = Math.floor(Math.random() * 100) + 50;
+            b = Math.floor(Math.random() * 50) + 1;
+            question = `${a} - ${b}`;
+            answer = a - b;
+            break;
+          case '*':
+            a = Math.floor(Math.random() * 20) + 1;
+            b = Math.floor(Math.random() * 10) + 1;
+            question = `${a} × ${b}`;
+            answer = a * b;
+            break;
+          case '/':
+            b = Math.floor(Math.random() * 10) + 1;
+            answer = Math.floor(Math.random() * 10) + 1;
+            a = b * answer;
+            question = `${a} ÷ ${b}`;
+            break;
+        }
+        
+        questions.push({ question, answer });
+      }
+      return questions;
+    }
+
+    function startMiniGame(){
+      if(coins<5) return alert("Need 5 coins!");
+      
+      // Filter out recently used questions
+      const availableQuestions = miniGameQuestions.filter(q => 
+        !questionHistory.miniGames.includes(q.question)
+      );
+      
+      if(availableQuestions.length === 0) {
+        // Reset if we've shown most questions
+        questionHistory.miniGames = [];
+        availableQuestions.push(...miniGameQuestions);
+      }
+      
+      const q = availableQuestions[Math.floor(Math.random() * availableQuestions.length)];
+      questionHistory.miniGames.push(q.question);
+      localStorage.setItem('questionHistory', JSON.stringify(questionHistory));
+      
+      coins-=5; 
+      localStorage.setItem('coins',coins);
+      updateCoinDisplay();
+      
+      document.getElementById('miniGameBox').innerHTML=
+        `<p>What is ${q.question}?</p>
+         <input type="number" id="miniAnswer" style="font-size: 20px; padding: 15px; width: 200px;"/>
+         <button onclick="checkMini(${q.answer})" class="btn large-button">Submit</button>`;
+    }
+
+    function checkMini(correct){
+      const user=+document.getElementById('miniAnswer').value;
+      if(user===correct){
+        const winAmount = 10 + Math.floor(Math.random() * 5);
+        alert(`👍 Correct! +${winAmount} coins`);
+        coins+=winAmount; 
+        localStorage.setItem('coins',coins);
+        updateCoinDisplay();
+      } else {
+        alert(`❌ Incorrect. The answer was ${correct}`);
+      }
+      document.getElementById('miniGameBox').innerHTML='';
+    }
+
+    // ─── INIT ───────────────────────────────────────────────────────────
+    window.addEventListener('load',()=>{
+      loadStore(); 
+      loadConvert();
+      // Load theme from storage
+      const savedTheme = localStorage.getItem('theme') || 'black';
+      setTheme(savedTheme);
+    });
+  </script>
+</body>
+</html>
